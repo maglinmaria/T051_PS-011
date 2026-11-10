@@ -8,7 +8,7 @@ Prepared by 10 SECONDS for Team T051.
 |---|---|---|
 | `policies.csv` | 10 motor policies with vehicle, IDV, add-ons, NCB and excess | 10 data rows |
 | `claims.csv` | 18 claims (own damage, flood, theft) with intimation, FIR and licence data | 18 data rows |
-| `survey_lines.csv` | Surveyor report lines, 6-12 per non-theft claim | 114 data rows |
+| `survey_lines.csv` | Surveyor report lines, 6-12 per non-theft claim | 114 data rows; 113 retained after duplicate validation |
 | `commands.txt` | ASSESS, THEFT_RECOVERED, SETTLE_THEFT, RENEW and print commands in date order | 62 command lines (excluding comments) |
 
 Row numbers quoted below are 1-based data-row numbers (the header is row 0). Line numbers for `commands.txt` are physical line numbers including comment lines.
@@ -62,6 +62,61 @@ Conventions: dates `YYYY-MM-DD`; timestamps `YYYY-MM-DD HH:MM:SS` (24h, IST, no 
 | engine_part | bool | — | — | true = engine line (FLOOD needs ENGINE_PROTECT) |
 | part_cost | decimal | Rs | — | before depreciation, before GST |
 | labour_cost | decimal | Rs | — | never depreciated; not paid on a rejected line |
+
+## Data relationships, validation, and processing
+
+The CSV row counts below were checked directly against the files in `data/`.
+The 114 survey rows include the duplicate `SVL-0114`; validation removes that
+row, leaving 113 survey lines in application state and in the sample
+`claim_lines.csv` output.
+
+### Relationships
+
+- `policies.csv.policy_id` identifies a policy. `claims.csv.policy_id`
+  references that policy; a claim with an unknown policy ID is reported as a
+  validation error.
+- `claims.csv.claim_id` identifies a claim. `survey_lines.csv.claim_id`
+  references that claim; a survey line with an unknown claim ID is reported
+  and excluded.
+- Survey lines are grouped by claim ID. A claim can have multiple survey
+  lines, and repeated part names are allowed when the line details differ.
+- Theft claims have no repair survey lines in the supplied dataset; their
+  settlement is driven by the claim/policy values and theft commands.
+
+### Input processing
+
+`data/commands.txt` is the application command stream (62 nonblank,
+non-comment commands). The processor executes it in file order. It loads the
+policy, claim, and survey CSVs, validates the loaded data after
+`LOAD_SURVEY`, then assesses claims, handles theft actions, renews policies,
+and queues requested reports. The CSV loader converts dates, timestamps,
+decimal amounts, booleans, and semicolon-separated add-ons to Python values.
+Errors are retained and written to `output/errors.csv`. The supplied tests
+confirm that the sample data yields 10 policies, 18 claims, and 113 retained
+survey lines.
+
+### Validation rules in the implementation
+
+| Data | Checks performed |
+|---|---|
+| Policies | Policy ID is present and not already loaded; holder type and add-ons are recognized; engine capacity, invoice value, and IDV are positive; voluntary excess is non-negative; policy start is not after policy end; vehicle purchase date is not after policy start; NCB is one of 0, 20, 25, 35, 45, or 50. |
+| Claims | Claim ID is present and not already loaded; policy reference exists; cause, licence status, and salvage option are recognized; intimation is not before the incident; FIR is supplied only for theft and is required for theft. |
+| Survey lines | Line ID is present; claim reference exists; part category is recognized; part and labour costs are non-negative; exact duplicate details are removed. |
+| Claim assessment | A policy must cover the incident date; a valid licence must remain valid through the incident date; intimation and theft-FIR deadlines are applied during assessment/processing. An incident before the vehicle purchase date causes the vehicle-age calculation to fail. |
+
+Malformed row values, missing fields, and validation failures are recorded
+with their source and row/reference information rather than counted as
+accepted records.
+
+### Duplicate survey-line handling
+
+Validation compares all survey details except the unique `line_id`: claim ID,
+part name after trimming and case-folding, category, engine-part flag, part
+cost, and labour cost. Only an exact match on those details is considered a
+duplicate; repeated part names with different details remain valid. The
+second copy is rejected and an error is recorded. In this pack,
+`SVL-0114` duplicates `SVL-0077` for `CLM-013`, so `SVL-0114` is excluded
+from assessment and reports.
 
 ## Command file format
 
