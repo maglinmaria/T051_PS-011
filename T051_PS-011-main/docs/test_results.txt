@@ -1,0 +1,36 @@
+PS-011 — Team T051 — Test Evidence
+Date: 11 November 2026
+
+Command:
+  python -m pytest -q
+
+Result:
+  40 passed
+
+Sample backend command:
+  python -m src.main
+
+Sample processing summary:
+  Policies loaded : 10
+  Claims loaded   : 18
+  Claims assessed : 18
+  Claim lines     : 113 rows
+  Claim sheets    : 18 rows
+  Policy histories: 10 rows
+  Errors recorded: 2
+
+The two expected validation records are:
+  1. Duplicate survey line SVL-0114.
+  2. Unknown claim ID CLM-099.
+
+Browser dashboard smoke test:
+  GET /                 -> HTTP 200
+  GET /api/reports      -> HTTP 200; 18 claim sheets, 113 claim lines,
+                           10 policy histories, 2 error records
+  POST /api/run         -> HTTP 200; backend run successful
+
+Coverage notes:
+  See docs/design_document.md, Section 12, Business-rule traceability matrix.
+  The exact 12-month RTI anniversary interpretation remains unresolved in
+  the supplied design material and is intentionally documented rather than
+  silently changed.

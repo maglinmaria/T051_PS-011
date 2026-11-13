@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motor Insurance Claims | Team T051</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#667085; --line:#e5e9f0; --blue:#2457c5; --bg:#f5f7fb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 Arial, sans-serif; }
+    header { background:#14213d; color:white; padding:26px max(22px, calc((100% - 1180px)/2)); }
+    header h1 { margin:0 0 5px; font-size:25px; }
+    header p { margin:0; color:#d7e1f5; }
+    main { max-width:1180px; margin:24px auto; padding:0 18px 45px; }
+    .toolbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+    button, .download { border:0; border-radius:8px; padding:10px 15px; background:var(--blue); color:white; cursor:pointer; font-weight:600; text-decoration:none; }
+    button:disabled { opacity:.6; cursor:wait; }
+    #status { color:var(--muted); }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:18px 0 22px; }
+    .metric, .panel { background:white; border:1px solid var(--line); border-radius:12px; padding:17px; }
+    .metric span { display:block; color:var(--muted); font-size:13px; }
+    .metric strong { display:block; font-size:27px; margin-top:4px; }
+    .tabs { display:flex; gap:7px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:16px; }
+    .tab { background:transparent; color:var(--muted); border-radius:8px 8px 0 0; border-bottom:3px solid transparent; }
+    .tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+    .panel h2 { font-size:18px; margin:0 0 13px; }
+    .table-wrap { overflow:auto; max-height:430px; border:1px solid var(--line); border-radius:8px; }
+    table { width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px; }
+    th, td { padding:9px 11px; border-bottom:1px solid var(--line); text-align:left; }
+    th { position:sticky; top:0; background:#f0f3f8; z-index:1; }
+    tr:last-child td { border-bottom:0; }
+    .detail { margin-top:16px; background:#f8faff; border:1px solid var(--line); border-radius:8px; padding:14px; }
+    .detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px 18px; }
+    .detail-item span { display:block; color:var(--muted); font-size:12px; }
+    .detail-item strong { overflow-wrap:anywhere; }
+    .downloads { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 16px; }
+    .download { background:#edf2ff; color:#2049a5; font-size:13px; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#101828; color:#e5e7eb; padding:13px; border-radius:8px; max-height:220px; overflow:auto; }
+    .hidden { display:none; }
+    .empty { color:var(--muted); padding:15px 0; }
+    footer { color:var(--muted); font-size:12px; margin-top:20px; }
+    @media(max-width:720px) { .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Motor Insurance Claims Settlement</h1>
+    <p>PS-011 · Team T051 · IDV, Depreciation and No Claim Bonus</p>
+  </header>
+  <main>
+    <section class="toolbar">
+      <button id="runBtn">Run sample processing</button>
+      <span id="status">Ready. Run the sample workflow to refresh reports.</span>
+    </section>
+    <section class="metrics" aria-label="Processing overview">
+      <div class="metric"><span>Claims processed</span><strong id="claimsCount">—</strong></div>
+      <div class="metric"><span>Policies in history</span><strong id="policiesCount">—</strong></div>
+      <div class="metric"><span>Survey line rows</span><strong id="linesCount">—</strong></div>
+      <div class="metric"><span>Validation records</span><strong id="errorsCount">—</strong></div>
+    </section>
+    <section class="panel">
+      <nav class="tabs" aria-label="Reports">
+        <button class="tab active" data-tab="claims">Claim settlements</button>
+        <button class="tab" data-tab="lines">Survey line details</button>
+        <button class="tab" data-tab="history">Policy &amp; NCB history</button>
+        <button class="tab" data-tab="errors">Errors</button>
+      </nav>
+      <div id="claims" class="tab-content">
+        <h2>Claim settlement results</h2>
+        <div class="downloads"><a class="download" href="/api/download/claim_sheet">Download claim summary CSV</a></div>
+        <div id="claimsTable"></div>
+        <div id="claimDetail" class="detail hidden"></div>
+      </div>
+      <div id="lines" class="tab-content hidden">
+        <h2>Part-wise survey assessment</h2>
+        <div class="downloads"><a class="download" href="/api/download/claim_lines">Download claim lines CSV</a></div>
+        <div id="linesTable"></div>
+      </div>
+      <div id="history" class="tab-content hidden">
+        <h2>Policy history and NCB</h2>
+        <div class="downloads"><a class="download" href="/api/download/policy_history">Download policy history CSV</a></div>
+        <div id="historyTable"></div>
+      </div>
+      <div id="errors" class="tab-content hidden">
+        <h2>Validation and command errors</h2>
+        <div class="downloads"><a class="download" href="/api/download/errors">Download errors CSV</a></div>
+        <div id="errorsTable"></div>
+      </div>
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <h2>Execution output</h2>
+      <pre id="executionOutput">No run has been started in this session.</pre>
+    </section>
+    <footer>Team T051 · PS-011. The existing command-file backend performs all claim calculations. This dashboard is a local demonstration interface.</footer>
+  </main>
+<script>
+  const reportState = { claims: [], lines: [], history: [], errors: [] };
+  const $ = (id) => document.getElementById(id);
+  function makeTable(rows, targetId) {
+    const target = $(targetId); target.replaceChildren();
+    if (!rows || !rows.length) { const p=document.createElement('p'); p.className='empty'; p.textContent='No report data available yet.'; target.append(p); return; }
+    const wrap=document.createElement('div'); wrap.className='table-wrap';
+    const table=document.createElement('table'); const thead=document.createElement('thead'); const headRow=document.createElement('tr');
+    Object.keys(rows[0]).forEach(key=>{const th=document.createElement('th'); th.textContent=key; headRow.append(th);});
+    thead.append(headRow); table.append(thead); const tbody=document.createElement('tbody');
+    rows.forEach(row=>{const tr=document.createElement('tr'); Object.keys(rows[0]).forEach(key=>{const td=document.createElement('td'); td.textContent=row[key] ?? ''; tr.append(td);}); tbody.append(tr);});
+    table.append(tbody); wrap.append(table); target.append(wrap);
+  }
+  function showClaimDetail(row) {
+    const box=$('claimDetail'); box.replaceChildren(); box.classList.remove('hidden');
+    const heading=document.createElement('h2'); heading.textContent='Claim computation: '+row.claim_id; box.append(heading);
+    const grid=document.createElement('div'); grid.className='detail-grid';
+    Object.entries(row).forEach(([key,value])=>{const item=document.createElement('div'); item.className='detail-item'; const label=document.createElement('span'); label.textContent=key; const strong=document.createElement('strong'); strong.textContent=value; item.append(label,strong); grid.append(item);});
+    box.append(grid);
+  }
+  function renderReports(reports) {
+    reportState.claims=reports.claim_sheet||[]; reportState.lines=reports.claim_lines||[]; reportState.history=reports.policy_history||[]; reportState.errors=reports.errors||[];
+    $('claimsCount').textContent=reportState.claims.length; $('policiesCount').textContent=reportState.history.length; $('linesCount').textContent=reportState.lines.length; $('errorsCount').textContent=reportState.errors.length;
+    makeTable(reportState.claims,'claimsTable'); makeTable(reportState.lines,'linesTable'); makeTable(reportState.history,'historyTable'); makeTable(reportState.errors,'errorsTable');
+    $('claimDetail').classList.add('hidden');
+    const table=$('claimsTable').querySelector('tbody');
+    if(table) table.addEventListener('click',(event)=>{const tr=event.target.closest('tr'); if(!tr)return; const id=tr.cells[0]?.textContent; const row=reportState.claims.find(item=>item.claim_id===id); if(row)showClaimDetail(row);});
+  }
+  async function loadReports() {
+    const response=await fetch('/api/reports'); const data=await response.json(); renderReports(data.reports||{});
+  }
+  $('runBtn').addEventListener('click', async()=>{
+    const btn=$('runBtn'); btn.disabled=true; $('status').textContent='Processing sample files...';
+    try { const response=await fetch('/api/run',{method:'POST'}); const data=await response.json(); $('executionOutput').textContent=data.output||data.error||'No output.'; if(data.reports)renderReports(data.reports); if(data.ok){$('status').textContent='Processing completed successfully.';} else {$('status').textContent='Processing failed. See execution output.';} }
+    catch(error){$('status').textContent='Could not contact the local server: '+error;}
+    finally{btn.disabled=false;}
+  });
+  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(item=>item.classList.toggle('active',item===button));
+    document.querySelectorAll('.tab-content').forEach(panel=>panel.classList.toggle('hidden',panel.id!==button.dataset.tab));
+  }));
+  loadReports().catch(()=>{});
+</script>
+</body>
+</html>

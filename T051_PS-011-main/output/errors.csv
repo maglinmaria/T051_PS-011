@@ -1,0 +1,3 @@
+﻿source,line_or_row,reference_id,reason
+survey_lines.csv,114,SVL-0114,Duplicate survey entry: Paint - side panels
+commands.txt,27,CLM-099,Unknown claim ID: CLM-099

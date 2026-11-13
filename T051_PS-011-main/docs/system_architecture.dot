@@ -1,0 +1,34 @@
+digraph Architecture {
+  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.4", fontname="DejaVu Sans", label="PS-011 System Architecture", labelloc=t, fontsize=20];
+  node [shape=box, style="rounded,filled", fillcolor="#F4F7FB", color="#344054", fontname="DejaVu Sans", fontsize=10, margin="0.16,0.10"];
+  edge [color="#475467", arrowsize=0.7];
+  ui [label="Optional Local Browser Dashboard\nweb_app.py + frontend/index.html", fillcolor="#E8F1FF"];
+  cli [label="Command-line Entry Point\nsrc/main.py"];
+  commands [label="Command File\ndata/commands.txt"];
+  processor [label="CommandProcessor"];
+  loaders [label="CSV Loaders\nPolicies · Claims · Survey Lines"];
+  models [label="Models + Application State"];
+  validators [label="Validation Module"];
+  engine [label="Claim Engine"];
+  calculations [label="Depreciation + Settlement"];
+  theft [label="Theft Processing"];
+  ncb [label="NCB Renewal"];
+  reports [label="Report Generator"];
+  outputs [label="CSV Reports\nclaim_sheet · claim_lines\npolicy_history · errors", fillcolor="#E8F7EE"];
+  ui -> cli [label="runs existing workflow"];
+  cli -> processor;
+  commands -> processor;
+  processor -> loaders;
+  loaders -> models;
+  models -> validators;
+  processor -> engine;
+  engine -> calculations;
+  processor -> theft;
+  processor -> ncb;
+  calculations -> models;
+  theft -> models;
+  ncb -> models;
+  models -> reports;
+  processor -> reports;
+  reports -> outputs;
+}
