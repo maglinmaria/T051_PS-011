@@ -156,10 +156,15 @@ this implementation difference is left explicit rather than reconciled here.
 - Recovery strictly before the eligibility date converts the theft to a
   repair assessment. Recovery on the eligibility date (day 90) or later does
   not convert it.
-- Once eligible, theft settlement is IDV minus total excess, or invoice value
-  minus total excess when RTI applies. The theft path does not calculate
-  repair parts, repair GST, delay deduction, salvage deduction, or the
-  Rs 500 minimum threshold.
+- Once eligible, theft settlement starts from IDV, or invoice value when RTI
+  applies, and deducts total excess. The general claim-intimation rules
+  (BR-01) and driving-licence rules (BR-02) also apply: intimation more than
+  48 hours late receives the 10% deduction after excess, learner-licence
+  claims are capped at 50% after that deduction, and invalid/expired licences
+  or intimation beyond seven days are rejected.
+- The theft path does not calculate repair parts, repair GST, or salvage
+  deduction. The Rs 500 minimum threshold is not applied to theft settlement
+  in this implementation.
 
 ### BR-10 — No Claim Bonus and renewal
 

@@ -45,8 +45,10 @@ presented as historical decisions.
   eligible RTI invoice value, with excess and any customer-kept salvage
   deduction.
 - **Confirmed:** Theft has its own 24-hour FIR and 90-day waiting-period
-  checks, recovery handling, and IDV/RTI less excess calculation. It does
-  not use repair GST, repair depreciation, or the repair minimum threshold.
+  checks and recovery handling. General claim-intimation, policy-validity and
+  driving-licence checks also apply; the delayed-intimation deduction and
+  learner-licence cap are applied where relevant. Theft does not use repair
+  GST, repair depreciation, salvage deduction, or the repair minimum threshold.
 
 ### NCB and policy renewals
 
@@ -70,8 +72,12 @@ presented as historical decisions.
 - **Confirmed:** Tests are implemented with pytest under `tests/`. The
   integration fixture runs the sample command stream, generates reports in
   a temporary directory, and checks decisions, calculations, row counts,
-  errors, duplicate filtering, and policy history. `requirements.txt`
+  errors, duplicate filtering, and policy history. Additional unit and
+  integration tests cover the listed business-rule boundaries. `requirements.txt`
   contains `pytest`.
+- **Confirmed:** `web_app.py` and `frontend/index.html` provide an optional
+  local browser dashboard using the Python standard library. The dashboard
+  invokes the existing backend rather than duplicating claim calculations.
 - **Selection rationale:** The repository demonstrates automated tests but
   does not record why pytest or this test strategy was selected.
 

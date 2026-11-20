@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import inspect
 from dataclasses import replace
@@ -13,7 +13,15 @@ from src.data_loader import (
     load_claims,
     load_survey_lines,
 )
-from src.claim_engine import assess_claim
+from src.claim_engine import (
+    assess_claim,
+    validate_intimation,
+    validate_driving_licence,
+    validate_policy_coverage,
+    calculate_intimation_delay_hours,
+    create_rejection_result,
+)
+from src.settlement import calculate_delay_deduction, calculate_learner_cap
 from src.ncb import process_ncb_renewal
 from src.rule_ids import format_rule_ids
 
@@ -418,7 +426,38 @@ class CommandProcessor:
             from src.settlement import calculate_total_excess
             from src.depreciation import calculate_vehicle_age_months
 
-            policy = self.app_state.policies[claim.policy_id]
+            policy = self.app_state.policies.get(claim.policy_id)
+            if policy is None:
+                self.add_error(
+                    "commands.txt", line_number, claim.policy_id,
+                    f"Unknown policy ID: {claim.policy_id}",
+                )
+                return
+
+            # Apply the general claim eligibility rules to theft claims too.
+            # The 24-hour FIR and 90-day waiting checks are additional theft rules.
+            intimation_valid, intimation_reason = validate_intimation(claim)
+            if not intimation_valid:
+                self.app_state.claim_results[claim_id] = create_rejection_result(
+                    policy, claim, [], intimation_reason, "BR-01"
+                )
+                return
+
+            licence_valid, licence_reason = validate_driving_licence(claim)
+            if not licence_valid:
+                self.app_state.claim_results[claim_id] = create_rejection_result(
+                    policy, claim, [], licence_reason, "BR-02"
+                )
+                return
+
+            policy_valid, policy_reason = validate_policy_coverage(policy, claim)
+            if not policy_valid:
+                self.app_state.claim_results[claim_id] = create_rejection_result(
+                    policy, claim, [], policy_reason, "BR-01"
+                )
+                return
+
+            delay_hours = calculate_intimation_delay_hours(claim)
 
             vehicle_age = calculate_vehicle_age_months(
                 policy.vehicle_purchase_date,
@@ -445,15 +484,29 @@ class CommandProcessor:
 
             excess = calculate_total_excess(policy)
 
-            payable = max(
+            amount_after_excess = max(
                 Decimal("0.00"),
                 base_amount - excess,
+            )
+            delay_deduction = calculate_delay_deduction(
+                amount_after_excess, claim
+            )
+            amount_after_delay = max(
+                Decimal("0.00"),
+                amount_after_excess - delay_deduction,
+            )
+            payable, learner_cap_deduction = calculate_learner_cap(
+                amount_after_delay, claim
             )
 
             rule_ids = {"BR-06", "BR-09"}
 
             if rti_eligible:
                 rule_ids.add("BR-08")
+            if delay_deduction > Decimal("0.00"):
+                rule_ids.add("BR-01")
+            if claim.driver_licence_status.upper() == "LEARNER":
+                rule_ids.add("BR-02")
 
             result = {
                 "claim_id": claim_id,
@@ -464,8 +517,8 @@ class CommandProcessor:
                 "labour_payable": Decimal("0.00"),
                 "gst": Decimal("0.00"),
                 "excess": excess,
-                "delay_deduction": Decimal("0.00"),
-                "learner_cap_deduction": Decimal("0.00"),
+                "delay_deduction": delay_deduction,
+                "learner_cap_deduction": learner_cap_deduction,
                 "salvage_deduction": Decimal("0.00"),
                 "settlement_basis": settlement_basis,
                 "payable": payable,

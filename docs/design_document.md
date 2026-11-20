@@ -21,25 +21,9 @@ validation, claim calculations, and report generation. `src/main.py` is the
 entry point. `CommandProcessor` executes the command file in order and passes
 shared `ApplicationState` through loaders and calculation functions.
 
-```mermaid
-flowchart TD
-    A["src/main.py"] --> B["CommandProcessor"]
-    B --> C["data/commands.txt"]
-    C --> D["CSV loaders"]
-    D --> E["Policy / Claim / SurveyLine models"]
-    E --> F["ApplicationState"]
-    F --> G["Validators"]
-    B --> H["Claim assessment"]
-    H --> I["Depreciation and settlement"]
-    B --> J["Theft command workflow"]
-    B --> K["NCB renewal"]
-    H --> F
-    J --> F
-    K --> F
-    F --> L["Report generator"]
-    B --> L
-    L --> M["output/*.csv"]
-```
+![System architecture diagram](system_architecture.png)
+
+Editable Graphviz source: `system_architecture.dot`.
 
 The implemented theft command workflow is in `command_processor.py`; the
 separate `theft.py` module also exposes theft eligibility and settlement
@@ -140,12 +124,14 @@ The command processor keeps theft apart from ordinary `ASSESS` processing:
    90 days converts the claim to a repair assessment; recovery on or after
    that date does not.
 3. `SETTLE_THEFT` before the eligibility date logs a premature command and
-   leaves settlement pending. On or after the date, it calculates IDV less
-   excess, or invoice value less excess when RTI applies.
+   leaves settlement pending. On or after the date, it validates the general
+   claim rules, then calculates IDV or eligible RTI invoice value less excess.
+   The 10% delayed-intimation deduction and learner-licence 50% cap are applied
+   after excess when applicable.
 
 The theft settlement route does not use repair-part depreciation, repair GST,
 or the repair minimum-settlement threshold. Details and boundary conditions
-are in BR-08 and BR-09 of [business_rules.md](./business_rules.md).
+are in BR-01, BR-02, BR-08 and BR-09 of [business_rules.md](./business_rules.md).
 
 ## 8. NCB and policy renewal workflow
 
@@ -195,7 +181,50 @@ write.
   `pathlib`, `inspect`, `calendar`, and `sys` support parsing, data models,
   dates, monetary arithmetic, filesystem paths, command dispatch, and process
   status.
-- **pytest** is listed in `requirements.txt` and is used by the automated
-  test suite.
+- **pytest** is used by the automated test suite.
+- **Python standard library** modules `http.server`, `subprocess`, `csv` and
+  `json` provide the optional local browser dashboard in `web_app.py`.
+- **HTML, CSS and JavaScript** provide the dashboard interface in
+  `frontend/index.html`.
 
-No external runtime calculation or web service dependency is declared.
+No third-party runtime dependency is required for the dashboard. The backend
+calculation engine uses Python modules and CSV files; it does not call an
+external insurance calculation service or web API.
+
+## 12. Business-rule traceability matrix
+
+The table maps each implemented business rule to its primary implementation location and the strongest evidence currently present in the repository. “Sample evidence” means the supplied data/command stream exercises the scenario; it is not a substitute for a dedicated assertion of every calculated amount.
+
+| Rule | Implementation location | Existing automated test evidence | Sample-data / verification evidence | Coverage note |
+|---|---|---|---|---|
+| BR-01 Intimation and delay | `src/claim_engine.py`: `validate_intimation`; `src/settlement.py`: `calculate_delay_deduction`; `src/command_processor.py`: theft FIR and general intimation checks | `test_intimation_after_seven_days_rejected`; `test_late_fir_theft_claim_rejected`; `test_theft_settlement_applies_delay_deduction_and_learner_cap`; `test_exactly_48_hours_has_no_intimation_deduction` | CLM-002 (exactly 48h), CLM-015 (>7 days), CLM-017 (50h), CLM-018 (late theft FIR) | Theft route applies the 10% deduction; 48h boundary is directly tested. |
+| BR-02 Licence and learner cap | `src/claim_engine.py`: `validate_driving_licence`; `src/settlement.py`: `calculate_learner_cap`; theft settlement in `src/command_processor.py` | `test_learner_licence_claim`; `test_expired_licence_rejected`; `test_theft_settlement_rejects_invalid_driving_licence`; `test_theft_settlement_applies_delay_deduction_and_learner_cap` | CLM-001 learner licence; CLM-006 expired licence | Learner cap amount and theft licence rejection now have direct test assertions. |
+| BR-03 Part depreciation | `src/depreciation.py`: `get_depreciation_rate`, `calculate_line_depreciation`, `calculate_vehicle_age_months` | `test_exactly_six_months_metal_depreciation`; `test_glass_depreciation_is_zero`; `test_depreciation_rates_cover_all_metal_age_bands`; `test_paint_depreciation_uses_half_paint_cost` | Survey data includes METAL, PLASTIC, RUBBER, NYLON, GLASS and PAINT categories | Metal age bands and paint's half-cost calculation are directly tested. |
+| BR-04 ZERO_DEP | `src/claim_engine.py`: `is_zero_dep_applicable`, `count_previous_zero_dep_claims` | `test_zero_dep_first_claim`; `test_third_zero_dep_claim_uses_normal_depreciation` | CLM-007, CLM-011 and CLM-016 exercise first/second/third claims | Add a dedicated test for vehicle age over 5 years and exact eligibility limit. |
+| BR-05 Consumables and engine protection | `src/settlement.py`: `get_line_coverage_status`, `calculate_survey_line` | `test_sample_consumables_and_flood_engine_lines_are_not_paid` | CLM-009 flood engine lines without ENGINE_PROTECT; CLM-010 consumables without CONSUMABLES | Both excluded part and labour amounts are directly asserted as zero. |
+| BR-06 Compulsory and voluntary excess | `src/settlement.py`: `calculate_compulsory_excess`, `calculate_total_excess` | `test_compulsory_excess_boundary_at_1500cc` | Sample policies exercise lower/higher engine capacities and voluntary excess | Exactly 1500cc and 1501cc are directly tested. |
+| BR-07 Total loss and salvage | `src/claim_engine.py`: `calculate_assessed_repair_cost`, `calculate_total_loss_settlement` | `test_total_loss_at_exact_75_percent`; `test_sample_total_loss_salvage_and_rti_amounts` | CLM-005 is exactly 75% of IDV and customer keeps salvage | Decision, 10% salvage and final payable are directly asserted. |
+| BR-08 RTI | `src/claim_engine.py`: `is_rti_applicable`; theft route in `src/command_processor.py` | `test_sample_total_loss_salvage_and_rti_amounts` | CLM-008 theft with RTI; CLM-005 total-loss scenario without RTI | Invoice settlement basis and amount are asserted. **Known ambiguity:** total-loss and theft paths differ at the exact 12-month anniversary; see `docs/business_rules.md` and `docs/decision_log.md`. |
+| BR-09 Theft settlement and recovery | `src/command_processor.py`: `theft_fir_is_late`, `get_theft_eligibility_date`, `process_theft_recovery`, `settle_theft` | `test_theft_claim_settlement`; `test_premature_theft_command_does_not_prevent_later_settlement`; `test_late_fir_theft_claim_rejected`; theft general-rule regression tests | CLM-004 recovery on day 90; CLM-008 premature then eligible settlement | Day-90 settlement and early-premature handling are covered by the integration suite. |
+| BR-10 NCB and NCB_PROTECT | `src/ncb.py`: `calculate_next_ncb`, `count_policy_year_claims`, `process_ncb_renewal` | `test_no_claim_policy_gets_ncb_increase`; `test_ncb_protect_only_preserves_one_claim`; renewal tests in `test_policy_renewal.py` | POL-005 has NCB_PROTECT with two claims; POL-010 has no claims | One protected claim retains NCB; two claims reset it, both directly tested. |
+| BR-11 Labour and GST | `src/settlement.py`: `calculate_survey_line`, `calculate_repair_settlement` | `test_repair_settlement_applies_individual_gst_and_corporate_zero` | Sample data includes individual and corporate policyholders and covered/uncovered labour lines | Individual 18% GST, corporate zero GST and full covered labour are directly tested. |
+| BR-12 Minimum settlement | `src/settlement.py`: `calculate_repair_settlement` | `test_below_threshold_claim`; `test_exact_500_rupees_is_not_below_threshold`; `test_sample_below_threshold_claim_is_counted_for_ncb` | CLM-003 calculates Rs 499.99 and remains counted for NCB | Both Rs 499.99 and exactly Rs 500.00 are covered. |
+
+### Verification status
+
+- The current automated suite passes **40 tests** in the checked project environment. Added tests cover theft-claim general checks, metal depreciation age bands, PAINT depreciation, the 1,500 cc excess boundary, NCB_PROTECT limits, GST/labour, exact Rs 500 threshold, RTI and salvage calculations, and uncovered survey lines.
+- The supplied sample command stream processes 18 claims, generates claim-line, claim-sheet, policy-history and error reports, and intentionally records a duplicate survey line and an unknown claim ID.
+- The table distinguishes tests that assert a result from sample scenarios that merely exercise a path. Not every calculation boundary has an independent assertion yet.
+- The exact 12-month RTI anniversary interpretation remains unresolved in the inspected project materials. It is recorded as an open interpretation rather than changed without an authoritative expected result.
+
+## 13. Detailed claim calculation flowchart
+
+The flowchart below shows the implemented processing order. Theft claims use the separate theft path; repair and total-loss claims share the initial policy, intimation and licence checks.
+
+![Detailed claim calculation flowchart](claim_calculation_flowchart.png)
+
+Editable Graphviz source: `claim_calculation_flowchart.dot`.
+
+## 14. Front-end addition
+
+A small local browser dashboard is provided by `web_app.py` and `frontend/index.html`. It calls the existing command-line entry point (`python -m src.main`) and displays the CSV reports produced by the same backend. It does not duplicate insurance calculations or replace the command-file interface. This is an optional presentation layer added for demonstration; the original project specification describes a command-file-driven application and lists a GUI as out of scope. It binds to `127.0.0.1` and uses only the Python standard library.
