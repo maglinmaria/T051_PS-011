@@ -75,17 +75,6 @@ The sample command file is `data/commands.txt`. The engine reads the CSV files i
 
 The sample dataset intentionally includes invalid/duplicate inputs. Therefore, entries in `errors.csv` can be expected validation results rather than application crashes. Check the error `reason` column.
 
-## 6. Run the front end (optional local dashboard)
-
-From the same project root, with the virtual environment activated:
-
-```powershell
-python web_app.py
-```
-
-Open `http://127.0.0.1:8000` in your browser. Select **Run sample processing** to execute the existing backend workflow. Use the tabs to inspect claim settlements, survey-line calculations, policy/NCB history and validation errors. CSV download links are provided in each report tab.
-
-The dashboard uses only the Python standard library, runs locally on your computer, and does not replace or change the command-file backend. The backend can always be run independently using `python -m src.main`.
 
 ## 7. Testing
 
