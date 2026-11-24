@@ -108,3 +108,6 @@ The prepared design PDF is `docs/design_document.pdf`. The editable Markdown sou
 ## 10. Team
 
 Team T051 — PS-011, 10 SECONDS Capstone.
+## 5-Minute Demo
+
+[Watch the Project Demonstration](demo_video.mp4)
