@@ -105,6 +105,9 @@ The prepared design PDF is `docs/design_document.pdf`. The editable Markdown sou
 5. Open `claim_lines.csv` to show part-wise depreciation and labour treatment.
 6. Open `policy_history.csv` to explain NCB renewal; briefly show `errors.csv` and explain the intentional duplicate/unknown-ID validation cases.
 
+
+Demo video drive link- https://drive.google.com/file/d/14cRhN2-JRgyfBkm_b6K1GmIpndSnozer/view?usp=sharing
+
 ## 10. Team
 
 Team T051 — PS-011, 10 SECONDS Capstone.
